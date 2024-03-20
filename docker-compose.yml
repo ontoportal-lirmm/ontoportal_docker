@@ -4,9 +4,7 @@ x-app: &api
   env_file:
     .env
   depends_on: &depends_on
-    solr-term:
-      condition: service_started
-    solr-prop:
+    solr-ut:
       condition: service_started
     redis-persistent:
       condition: service_healthy
@@ -80,29 +78,11 @@ services:
      - 4store_data:/var/lib/4store
     command: bash -c "4s-backend ontoportal_kb && 4s-httpd -D -s-1 -p 9000 ontoportal_kb"
 
-  solr-term:
-    image: solr:9.1
-    volumes:
-      - solr-term_data:/var/solr
+  solr-ut:
+    image: solr:8.11.2
+    ports:
+      - 8983:8983
     command: bin/solr start -cloud -f
-    healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:8983/solr/term_search_core1/admin/ping?wt=json | grep -iq '\"status\":\"OK\"}' || exit 1"]
-      start_period: 3s
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  solr-prop:
-    image: solr:9.1
-    volumes:
-      - solr-prop_data:/var/solr
-    command: bin/solr start -cloud -f
-    healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:8983/solr/prop_search_core1/admin/ping?wt=json | grep -iq '\"status\":\"OK\"}' || exit 1"]
-      start_period: 3s
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
   mgrep:
     image: ontoportal/mgrep:0.0.2
