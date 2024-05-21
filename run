@@ -128,10 +128,10 @@ fi
 
 
 echo "Running api ..."
-docker compose run --service-ports --rm  -d api
+docker compose run --service-ports -d api
 
  # Wait for API to be ready (adjust the sleep time accordingly)
-timeout=30
+timeout=100
 elapsed=0
 until [ $elapsed -ge $timeout ] || curl -sSf http://localhost:9393 > /dev/null 2>&1; do
     echo "Waiting for the server to be up..."
