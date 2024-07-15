@@ -5,10 +5,12 @@ API_URL="https://data.bioontology.org"
 STARTER_ONTOLOGY="STY"
 IMAGE_REPOSITORY="bioportal"
 IMAGE_TAG="latest"
-PROVISION=true  # Set the default value to true
+PROVISION=true # Set the default value to true
 
 # Function to display help message
 display_help() {
+    echo "Start an empty Ontoportal API with only admin user and the STY ontology. Mostly used for the UI tests."
+    echo "This script is deprecated and will be removed. Use instead ./ontoportal --help"
     echo "Usage: $0 [-k API_KEY] [-u API_URL] [-r IMAGE_REPOSITORY] [-t IMAGE_TAG] [-s STARTER_ONTOLOGY] [--no-provision]"
     exit 0
 }
@@ -16,18 +18,24 @@ display_help() {
 # Parse command line options
 while getopts ":k:u:r:t:s:-:h" opt; do
     case $opt in
-        k) API_KEY="$OPTARG";;
-        u) API_URL="$OPTARG";;
-        r) IMAGE_REPOSITORY="$OPTARG";;
-        t) IMAGE_TAG="$OPTARG";;
-        s) STARTER_ONTOLOGY="$OPTARG";;
-        h) display_help;;
-        -) case "${OPTARG}" in
-               no-provision) PROVISION=false;;
-               help) display_help;;
-           esac;;
-        \?) echo "Invalid option: -$OPTARG" >&2; exit 1;;
-        :) echo "Option -$OPTARG requires an argument." >&2; exit 1;;
+    k) API_KEY="$OPTARG" ;;
+    u) API_URL="$OPTARG" ;;
+    r) IMAGE_REPOSITORY="$OPTARG" ;;
+    t) IMAGE_TAG="$OPTARG" ;;
+    s) STARTER_ONTOLOGY="$OPTARG" ;;
+    h) display_help ;;
+    -) case "${OPTARG}" in
+        no-provision) PROVISION=false ;;
+        help) display_help ;;
+        esac ;;
+    \?)
+        echo "Invalid option: -$OPTARG" >&2
+        exit 1
+        ;;
+    :)
+        echo "Option -$OPTARG requires an argument." >&2
+        exit 1
+        ;;
     esac
 done
 
@@ -40,8 +48,7 @@ fi
 
 echo "Running the Ontoportal API and CRON Setup..."
 
-
- # Copy .env.sample to .env
+# Copy .env.sample to .env
 if ! cp .env.sample .env; then
     echo "Error: Failed to copy .env.sample to .env."
     exit 1
@@ -73,53 +80,12 @@ echo "Updating IMAGE_TAG in .env file..."
 env_content="${env_content//IMAGE_TAG=latest/IMAGE_TAG=$IMAGE_TAG}"
 
 # Write the modified content back to the .env file
-echo "$env_content" > "$env_file_path"
+echo "$env_content" >"$env_file_path"
 
-# Step 8: Run provisioning
-if [ "$PROVISION" = true ]; then
-    echo "Running the Ontoportal API and CRON Setup..."
 
-    # ... (rest of the script remains unchanged)
-
-    # Step 8: Run provisioning
-    echo "Running provisioning ..."
-    commands=(
-        'docker compose down --volumes > /dev/null 2>&1'
-        'docker compose run --rm  4store bash -c "4s-backend-setup ontoportal_kb" '
-        'docker compose run --rm  ncbo_cron bundle exec rake user:create[admin,admin@nodomain.org,password]'
-        'docker compose run --rm  ncbo_cron bundle exec rake user:adminify[admin]'
-        "docker compose run --rm  ncbo_cron bundle exec 'bin/ncbo_ontology_import --admin-user admin --ontologies $STARTER_ONTOLOGY --from-apikey $API_KEY --from $API_URL'"
-        "docker compose run --rm  ncbo_cron bundle exec 'bin/ncbo_ontology_pull -o $STARTER_ONTOLOGY'"
-        "docker compose run --rm  ncbo_cron bundle exec 'bin/ncbo_ontology_process -o ${STARTER_ONTOLOGY}'"
-    )
-
-    for cmd in "${commands[@]}"; do
-        echo "> Run: $cmd"
-        if ! eval "$cmd"; then
-          echo "Error: Failed to run provisioning .  $cmd"
-          exit 1
-        fi
-    done
-
-    echo "Setup completed successfully!"
+if [ "$PROVISION" = false ]; then
+    bin/run_api.sh start --no-provision
+else
+    bin/run_api.sh start
 fi
 
-
-
-echo "Running api ..."
-docker compose run --service-ports -d --rm api
-
- # Wait for API to be ready (adjust the sleep time accordingly)
-timeout=300
-elapsed=0
-until [ $elapsed -ge $timeout ] || curl -sSf http://localhost:9393 > /dev/null 2>&1; do
-    echo "Waiting for the server to be up..."
-    sleep 1
-    elapsed=$((elapsed + 1))
-done
-if [ $elapsed -ge $timeout ]; then
-    echo "Timed out waiting for the server to be up."
-    exit 1
-fi
-
-echo "Server is up and running!"
