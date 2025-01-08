@@ -13,7 +13,7 @@ start() {
 
 	source "$env_path"
 
-	docker_run_cmd="docker compose -f docker-compose_api.yml -p ontoportal_docker run  --remove-orphans --rm --name cron-service  --service-ports ncbo_cron bash -c \"$bash_cmd\""
+	docker_run_cmd="docker compose -f docker-compose_api.yml -p ontoportal_docker run --rm --name cron-service  --service-ports ncbo_cron bash -c \"$bash_cmd\""
 
 	echo "[+] Starting the CRON"
 	eval "$docker_run_cmd"

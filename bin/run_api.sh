@@ -86,7 +86,7 @@ run() {
   fi
 
   bash_cmd="rm -fr tmp/pids/unicorn.pid && (bundle check || bundle install) && bundle exec unicorn -c config/unicorn.rb -E production -l 9393"
-  docker_run_cmd="docker compose -f docker-compose_api.yml -p ontoportal_docker run --remove-orphans --name api-service --rm -d  --service-ports api bash -c \"$bash_cmd\""
+  docker_run_cmd="docker compose -f docker-compose_api.yml -p ontoportal_docker run --name api-service --rm -d  --service-ports api bash -c \"$bash_cmd\""
   echo "[+] Starting the API"
   eval "$docker_run_cmd"
 

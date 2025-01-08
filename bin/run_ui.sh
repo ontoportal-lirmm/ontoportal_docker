@@ -77,7 +77,7 @@ run() {
 
   bash_cmd="(bundle check || bundle install) && $create_secrets_cmd && $create_credentials_cmd  && $create_db_cmd && $run_server_cmd"
 
-  docker_run_cmd="docker compose -f docker-compose_ui.yml -p ontoportal_docker run  --remove-orphans  --rm  --name ui-service --service-ports -d production bash -c \"$bash_cmd\""
+  docker_run_cmd="docker compose -f docker-compose_ui.yml -p ontoportal_docker run --rm  --name ui-service --service-ports -d production bash -c \"$bash_cmd\""
 
   eval "$docker_run_cmd"
 
