@@ -57,10 +57,10 @@ provision() {
     clean_containers
     echo "[+] Running Cron provisioning"
     commands=(
-        "bin/run_cron.sh 'bundle exec rake user:create[admin,admin@nodomain.org,password]' >/dev/null 2>&1"
-        "bin/run_cron.sh 'bundle exec rake user:adminify[admin]' >/dev/null 2>&1"
-        "bin/run_cron.sh 'bundle exec bin/ncbo_ontology_import --admin-user admin --ontologies $STARTER_ONTOLOGY --from-apikey $OP_APIKEY --from $OP_API_URL' >/dev/null 2>&1"
-        "bin/run_cron.sh 'bundle exec bin/ncbo_ontology_process -o ${STARTER_ONTOLOGY}' >/dev/null 2>&1"
+        "bin/run_cron.sh 'bundle exec rake user:create[admin,admin@nodomain.org,password]'"
+        "bin/run_cron.sh 'bundle exec rake user:adminify[admin]'"
+        "bin/run_cron.sh 'bundle exec bin/ncbo_ontology_import --admin-user admin --ontologies $STARTER_ONTOLOGY --from-apikey $OP_APIKEY --from $OP_API_URL'"
+        "bin/run_cron.sh 'bundle exec bin/ncbo_ontology_process -o ${STARTER_ONTOLOGY}'"
     )
     for cmd in "${commands[@]}"; do
         echo "[+] Run: $cmd"
