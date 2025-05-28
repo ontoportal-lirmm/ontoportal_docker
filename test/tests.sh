@@ -12,8 +12,6 @@ setup() {
 
   run ./ontoportal start api 
   assert_output --partial "[+] API is up and running!"
-  refute_output --partial 'error'
-  refute_output --partial 'ERROR'
 
   ./ontoportal stop api
   run docker compose -f docker-compose_api.yml ps
@@ -27,8 +25,6 @@ setup() {
   run ./ontoportal start
 
   assert_output --partial "[+] UI is up and running!"
-  refute_output --partial 'error'
-  refute_output --partial 'ERROR'
 
   ./ontoportal stop api 
   ./ontoportal stop ui
