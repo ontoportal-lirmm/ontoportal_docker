@@ -38,8 +38,11 @@ clean() {
   fi
 
   if [[ "$answer" == "y" ]]; then
-    ./bin/run_ui.sh clean
-    ./bin/run_api.sh clean
+    docker compose down --volumes --remove-orphans
+    # Leftovers from the old layout: containers started with 'docker compose run'
+    # and compose files that were downloaded from the api/ui repositories
+    docker container rm -f api-service ui-service cron-service >/dev/null 2>&1
+    rm -f docker-compose_api.yml docker-compose_ui.yml
   else
     echo "You chose to exit. Goodbye!"
   fi
@@ -148,7 +151,7 @@ show_help() {
   echo "  stop    : Stop the API and UI services."
   echo "            Usage: $0 stop [api|ui]"
   echo
-  echo "  clean   : Clean up the server. WARNING: This removes all data, docker-compose files, and containers."
+  echo "  clean   : Clean up the server. WARNING: This removes all containers and data volumes."
   echo "            Usage: $0 clean [-f]"
   echo "            -f, --force   : Force clean the server without prompting for confirmation."
   echo

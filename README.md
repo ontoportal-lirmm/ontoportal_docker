@@ -14,6 +14,7 @@ With this project, you can quickly spin up a fully functional ontoPortal instanc
 - **config**: contains deploy.yml file which contains settings and parameters required for deployment using kamal deployment tool
 - **test**: testing-related files and scripts using bats testing framework
 - **utils**: utility and additional scripts for various purposes
+- **docker-compose.yml**: the appliance topology (API, UI and all their backing services). This file is owned by this repo; the api/ui repositories keep their own compose files for their development workflows
 - **.env.sample**: sample file contains configuration of the ontoportal instance (will be copied to .env when running)
 - **Dockerfile**: defines configurations to build the docker image for the project
 - **ontoportal**: the main script to run the ontoportal, it includes the entry point and main execution logic for the ontoPortal services
@@ -72,12 +73,12 @@ With this project, you can quickly spin up a fully functional ontoPortal instanc
 
 ### Additional Notes
 - You can provide your own `.env` file to customize parameters. Place the .env file in the project directory.
+- The service topology (containers, hostnames, volumes) lives in `docker-compose.yml` in this repository; edit that file directly to change it.
 - `.env` file contains 5 parts:
     - **General configuration**: where you can specify:
     ```yml
-    ORGANIZATION_NAME: github organization from where script will fetch docker compose files
-    COMPOSE_API_FILE_PATH: docker compose file of the UI 
-    COMPOSE_UI_FILE_PATH: docker compose file of the UI 
+    IMAGE_REPOSITORY: Docker Hub organization of the OntoPortal images (api, cron, ui)
+    IMAGE_TAG: tag of the OntoPortal images to run
     SERVICE: specify the service you want to run (script will handle this)
     ```
     - **API Configurations:** contains settings for api service
@@ -91,3 +92,7 @@ With this project, you can quickly spin up a fully functional ontoPortal instanc
     KAMAL_REGISTRY_PASSWORD: password of token to access the repository
     SSH_USER: the user that will be used when deploying into the server
     ```
+
+### Upgrading from an older checkout
+Older versions downloaded the compose files from the api/ui repositories at start time; the topology is now versioned here in `docker-compose.yml`. If you upgraded an existing checkout:
+- Delete your `.env` (or update it: remove `ORGANIZATION_NAME`/`COMPOSE_*_FILE_PATH` and set `IMAGE_REPOSITORY=agroportal`, `IMAGE_TAG=development`), then run `./ontoportal clean -f` once to remove containers and files from the old layout.

@@ -14,7 +14,7 @@ setup() {
   assert_output --partial "[+] API is up and running!"
 
   ./ontoportal stop api
-  run docker compose -f docker-compose_api.yml ps
+  run docker compose ps
   assert_output "NAME      IMAGE     COMMAND   SERVICE   CREATED   STATUS    PORTS"
 }
 
@@ -26,9 +26,9 @@ setup() {
 
   assert_output --partial "[+] UI is up and running!"
 
-  ./ontoportal stop api 
+  ./ontoportal stop api
   ./ontoportal stop ui
 
-  run docker compose -f docker-compose_ui.yml ps
+  run docker compose ps
   assert_output "NAME      IMAGE     COMMAND   SERVICE   CREATED   STATUS    PORTS"
 }

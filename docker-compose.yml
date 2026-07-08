@@ -1,0 +1,158 @@
+# OntoPortal appliance topology: API + UI + their backing services.
+#
+# This file is owned by this repo. The ontologies_api and bioportal_web_ui
+# repos keep their own docker-compose.yml for their development and test
+# workflows; this file is the deployment/appliance view and is intentionally
+# independent from them.
+#
+# The OntoPortal images (api, cron, ui) are selected with IMAGE_REPOSITORY and
+# IMAGE_TAG in .env (defaults: agroportal / development).
+
+name: ontoportal_docker
+
+x-api-env: &api-env
+  # Backing-service endpoints, matching the service names declared below.
+  REDIS_HOST: redis
+  REDIS_PORT: 6379
+  REDIS_GOO_CACHE_HOST: redis
+  REDIS_HTTP_CACHE_HOST: redis
+  REDIS_PERSISTENT_HOST: redis
+  SOLR_TERM_SEARCH_URL: http://solr:8983/solr
+  SOLR_PROP_SEARCH_URL: http://solr:8983/solr
+  GOO_BACKEND_NAME: virtuoso
+  GOO_HOST: virtuoso
+  GOO_PORT: 8890
+  GOO_PATH_DATA: /sparql/
+  GOO_PATH_QUERY: /sparql/
+  GOO_PATH_UPDATE: /sparql/
+  MGREP_HOST: mgrep
+  MGREP_PORT: 55555
+  REPOSITORY_FOLDER: /srv/ontoportal/data/repository
+  REPORT_PATH: /srv/ontoportal/data/reports/ontologies_report.json
+  MGREP_DICTIONARY_FILE: /srv/ontoportal/data/mgrep
+
+x-api-depends: &api-depends
+  redis:
+    condition: service_healthy
+  solr:
+    condition: service_healthy
+  virtuoso:
+    condition: service_started
+  mgrep:
+    condition: service_started
+
+services:
+  api:
+    image: ${IMAGE_REPOSITORY:-agroportal}/ontologies_api:v3.5
+    container_name: api-service
+    env_file: .env
+    environment: *api-env
+    command: ["bash", "-c", "rm -f tmp/pids/unicorn.pid && (bundle check || bundle install) && bundle exec unicorn -c config/unicorn.rb -E production -l 9393"]
+    ports:
+      - "9393:9393"
+    volumes:
+      - repository:/srv/ontoportal/data/repository
+    depends_on:
+      <<: *api-depends
+      ncbo_cron:
+        condition: service_started
+
+  ncbo_cron:
+    image: ${IMAGE_REPOSITORY:-agroportal}/ncbo_cron:v3.5
+    env_file: .env
+    environment: *api-env
+    command: ["bundle", "exec", "bin/ncbo_cron"]
+    volumes:
+      - repository:/srv/ontoportal/data/repository
+      - reports:/srv/ontoportal/data/reports
+      - mgrep_dictionary:/srv/ontoportal/data/mgrep
+      - cron_logs:/srv/ontoportal/ncbo_cron/logs
+    depends_on: *api-depends
+
+  redis:
+    image: redis
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: redis-cli ping
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  solr:
+    image: solr:8
+    command: bin/solr start -cloud -f
+    volumes:
+      - solr_data:/var/solr/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8983/solr/admin/info/system?wt=json || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+
+  mgrep:
+    image: ontoportal/mgrep-ncbo:0.1
+
+  virtuoso:
+    image: tenforce/virtuoso:virtuoso7.2.5
+    platform: linux/amd64
+    environment:
+      SPARQL_UPDATE: "true"
+    volumes:
+      - virtuoso_data:/data
+    healthcheck:
+      # the image has no curl/wget, so plain TCP check on the SPARQL port
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/localhost/8890'"]
+      start_period: 10s
+      interval: 60s
+      timeout: 5s
+      retries: 3
+
+  ui:
+    image: ${IMAGE_REPOSITORY:-agroportal}/ontoportal_web_ui:v3.5.1
+    container_name: ui-service
+    env_file: .env
+    environment:
+      RAILS_ENV: production
+      DB_HOST: db
+      MEMCACHE_SERVERS: cache:11211
+      BIOPORTAL_WEB_UI_DATABASE_PASSWORD: root
+    # The image ships its gems and precompiled assets. config/puma.rb binds a
+    # unix socket in production and redirects its output to log files, so the
+    # TCP bind is forced on the command line and the directories that the puma
+    # config expects (socket, pidfile, logs) are created first.
+    command: ["bash", "-c", "(bundle check || bundle install) && bin/rails db:prepare && mkdir -p log tmp/pids /opt/ontoportal/bioportal_web_ui/shared/tmp/sockets && exec bundle exec puma -C config/puma.rb -b tcp://0.0.0.0:3000"]
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+      cache:
+        condition: service_started
+
+  db:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      # check over TCP: during first-boot initialization mysql runs a temporary
+      # socket-only server, so a socket ping would report healthy too early
+      test: ["CMD-SHELL", "mysql -h127.0.0.1 -uroot -proot -e 'SELECT 1' >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 30s
+
+  cache:
+    image: memcached:latest
+    command: ["-m", "1024"]
+
+volumes:
+  repository:
+  reports:
+  mgrep_dictionary:
+  cron_logs:
+  solr_data:
+  virtuoso_data:
+  mysql_data:

@@ -1,24 +1,13 @@
 #!/usr/bin/env bash
+# Services of the API stack in docker-compose.yml
+API_SERVICES="api ncbo_cron redis solr mgrep virtuoso"
+
 setup() {
   echo "[+] Setup API"
-  local env_path='.env'
-  if [ -z "$env_path" ]; then
-    echo "[-] Error: Missing required configurations. Please provide the path to your .env file"
-    exit 1
+  if [ ! -f ".env" ]; then
+    cp .env.sample .env
   fi
-  source "$env_path"
-
-  if
-    [ -z "$ORGANIZATION_NAME" ]
-    [ -z "$COMPOSE_API_FILE_PATH" ]
-  then
-    echo "[-] Error: Missing required configurations. Please provide both ORGANIZATION_NAME and COMPOSE_API_FILE_PATH in  your .env file"
-    exit 1
-  fi
-
-  echo "[+] Getting compose file for API"
-  echo "[+] Getting compose file from: $ORGANIZATION_NAME$COMPOSE_API_FILE_PATH"
-  eval "curl -sS -L https://raw.githubusercontent.com/$ORGANIZATION_NAME$COMPOSE_API_FILE_PATH -o docker-compose_api.yml"
+  source .env
 }
 
 status_ok() {
@@ -29,32 +18,32 @@ logs() {
   docker exec -it api-service tail -f log/production.log
 }
 
-clean_containers() {
-  echo "[+] Cleaning the API containers"
-  docker container rm -f api-service >/dev/null 2>&1
-  docker compose -f docker-compose_api.yml --profile 4store down --volumes >/dev/null 2>&1
+reset_data() {
+  echo "[+] Removing containers and data volumes"
+  docker compose down --volumes --remove-orphans
+  # Leftovers from the old layout where containers were started with 'docker compose run'
+  docker container rm -f api-service ui-service cron-service >/dev/null 2>&1
 }
 
 clean() {
-  clean_containers
-  rm -f docker-compose_api.yml >/dev/null 2>&1
+  echo "[+] Cleaning the API"
+  reset_data
 }
 
 update() {
-  echo "[+] Pulling latest images for api"
-  docker compose -f docker-compose_api.yml --profile 4store pull
+  echo "[+] Pulling latest images for the API"
+  docker compose pull $API_SERVICES
 }
 
 stop() {
   echo "[+] Stopping the API"
-  docker stop api-service
-  docker compose -f docker-compose_api.yml --profile 4store stop
+  docker compose stop $API_SERVICES
 }
 
 provision() {
   if [ -z "$1" ]; then
     source .env
-    clean_containers
+    reset_data
     echo "[+] Running Cron provisioning"
     commands=(
         "bin/run_cron.sh 'bundle exec rake user:create[admin,admin@nodomain.org,password]'"
@@ -76,25 +65,10 @@ provision() {
 }
 
 run() {
-  local env_path='.env'
-
-  source "$env_path"
-
-  if [ -z "$API_URL" ]; then
-    echo "[-] Error: Missing required configurations. Please provide the API_URL in your .env file"
-    exit 1
-  fi
-
-  bash_cmd="rm -fr tmp/pids/unicorn.pid && (bundle check || bundle install) && bundle exec unicorn -c config/unicorn.rb -E production -l 9393"
-  docker_run_cmd="docker compose -f docker-compose_api.yml -p ontoportal_docker run --name api-service --rm -d  --service-ports api bash -c \"$bash_cmd\""
   echo "[+] Starting the API"
-  eval "$docker_run_cmd"
-
-  # Wait for API to be ready (adjust the sleep time accordingly)
-  if docker ps --format '{{.Names}}' | grep -q "^api-service$"; then
-    echo "[+] API containers started"
-  else
-    eval "$docker_run_cmd > /dev/null 2>&1;"
+  if ! docker compose up -d api; then
+    echo "[-] Error starting the API containers. Exiting..."
+    exit 1
   fi
 
   local HOST_IP='localhost'
@@ -136,7 +110,7 @@ usage() {
   echo "  start      Start the API"
   echo "  stop       Stop the API"
   echo "  logs       View the logs of the API"
-  echo "  clean      Clean the API containers"
+  echo "  clean      Stop the appliance and remove all containers and data volumes"
   echo "  update     Update the API containers to the latest version"
   exit 1
 }

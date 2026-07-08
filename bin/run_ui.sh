@@ -1,24 +1,13 @@
 #!/usr/bin/env bash
+# Services of the UI stack in docker-compose.yml
+UI_SERVICES="ui db cache"
+
 setup() {
   echo "[+] Setup UI"
-  local env_path='.env'
-
-  if [ -z "$env_path" ]; then
-    echo "[-] Error: Missing required configurations. Please provide the path to your .env file"
-    exit 1
+  if [ ! -f ".env" ]; then
+    cp .env.sample .env
   fi
-
-  source "$env_path"
-
-  if
-    [ -z "$ORGANIZATION_NAME" ]
-    [ -z "$COMPOSE_API_FILE_PATH" ]
-  then
-    echo "[-] Error: Missing required configurations. Please provide both ORGANIZATION_NAME and COMPOSE_API_FILE_PATH in  your .env file"
-    exit 1
-  fi
-  echo "[+] Getting compose file from: $ORGANIZATION_NAME$COMPOSE_UI_FILE_PATH"
-  eval "curl -sS -L https://raw.githubusercontent.com/$ORGANIZATION_NAME$COMPOSE_UI_FILE_PATH -o docker-compose_ui.yml"
+  source .env
 }
 
 status_ok() {
@@ -30,62 +19,32 @@ logs() {
 }
 
 update() {
-  docker compose -f docker-compose_ui.yml pull
-}
-
-clean_containers() {
-  echo "[+] Cleaning the UI containers"
-  docker container rm -f ui-service >/dev/null 2>&1
-  docker compose -f docker-compose_ui.yml down --volumes >/dev/null 2>&1
+  echo "[+] Pulling latest images for the UI"
+  docker compose pull $UI_SERVICES
 }
 
 clean() {
-  clean_containers
-  rm -f docker-compose_ui.yml >/dev/null 2>&1
+  echo "[+] Cleaning the UI"
+  docker compose down --volumes --remove-orphans
+  # Leftovers from the old layout where containers were started with 'docker compose run'
+  docker container rm -f api-service ui-service cron-service >/dev/null 2>&1
 }
 
 stop() {
   echo "[+] Stopping the UI"
-  docker stop ui-service
-  docker compose -f docker-compose_ui.yml stop
+  docker compose stop $UI_SERVICES
 }
 
 run() {
-  local env_path='.env'
+  source .env
 
-  if [ -z "$env_path" ]; then
-    echo "[-] Error: Missing required configurations. Please provide the path to your .env file"
+  if [ -z "$API_URL" ] || [ -z "$API_KEY" ]; then
+    echo "[-] Error: Missing required arguments. Please provide both API_URL and API_KEY in your .env"
     exit 1
   fi
 
-  source "$env_path"
-
-  local api_url="$API_URL"
-  local api_key="$API_KEY"
-
-  if [ -z "$api_url" ] || [ -z "$api_key" ]; then
-    echo "[-] Error: Missing required arguments. Please provide both --api-url and --api-key or update them in your .env"
-    exit 1
-  fi
   echo "[+] Starting the UI"
-
-  create_secrets_cmd="bin/rails secret"
-  create_credentials_cmd="EDITOR='nano' bin/rails credentials:edit"
-  create_db_cmd="bin/rails db:prepare"
-  run_server_cmd="bundle exec puma -C config/puma.rb"
-  #run_server_cmd="bash"
-
-  bash_cmd="(bundle check || bundle install) && $create_secrets_cmd && $create_credentials_cmd  && $create_db_cmd && $run_server_cmd"
-
-  docker_run_cmd="docker compose -f docker-compose_ui.yml -p ontoportal_docker run --rm  --name ui-service --service-ports -d production bash -c \"$bash_cmd\""
-
-  eval "$docker_run_cmd"
-
-  # Wait for UI to be ready (adjust the sleep time accordingly)
-  sleep 1
-  if docker ps --format '{{.Names}}' | grep -q "^ui-service$"; then
-    echo "[+] UI containers started"
-  else
+  if ! docker compose up -d ui; then
     echo "[x] UI containers failed to start"
     exit 1
   fi
@@ -128,7 +87,7 @@ usage() {
   echo "  start      Start the UI"
   echo "  stop       Stop the UI"
   echo "  logs       View the logs of the UI"
-  echo "  clean      Clean the UI containers"
+  echo "  clean      Stop the appliance and remove all containers and data volumes"
   echo "  update     Update the UI containers to the latest version"
   exit 1
 }

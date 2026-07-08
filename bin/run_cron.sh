@@ -6,20 +6,20 @@ start() {
 
 	echo "[+] Running cron script"
 
-	if [ -z "$env_path" ]; then
-		echo "[-] Error: Missing required configurations. Please provide the path to your .env file"
+	if [ ! -f "$env_path" ]; then
+		echo "[-] Error: Missing required configurations. Please provide your .env file"
 		exit 1
 	fi
 
 	source "$env_path"
 
-	docker_run_cmd="docker compose -f docker-compose_api.yml -p ontoportal_docker run --rm --name cron-service  --service-ports ncbo_cron bash -c \"$bash_cmd\""
+	docker_run_cmd="docker compose run --rm ncbo_cron bash -c \"$bash_cmd\""
 
 	echo "[+] Starting the CRON"
 	eval "$docker_run_cmd"
 
 	if [ $? -ne 0 ]; then
-		echo "[-] Error in run_con function. Exiting..."
+		echo "[-] Error in run_cron function. Exiting..."
 		exit 1
 	fi
 
